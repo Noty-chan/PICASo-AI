@@ -1,20 +1,21 @@
-"""Примеры обработчиков для бота."""
+"""Обработчики для работы с базой данных."""
 from typing import List
-from classifier import prepare_image
+
 from db import crud
 
 
-def add_image(file_path: str, authors: List[str] | None = None, characters: List[str] | None = None):
-    """Загрузить изображение, получить теги и сохранить в БД.
-
-    Возвращает кортеж `(image, suggested_tags)` для отображения пользователю.
-    """
+def add_image(
+    file_path: str,
+    authors: List[str] | None = None,
+    tags: List[str] | None = None,
+    characters: List[str] | None = None,
+):
+    """Сохранить изображение и связанные сущности в БД."""
     authors = authors or []
+    tags = tags or []
     characters = characters or []
-    new_path, tagger = prepare_image(file_path)
-    suggested_tags = tagger.suggest_tags(new_path)
-    image = crud.add_image(new_path, authors, suggested_tags, characters)
-    return image, suggested_tags
+    image = crud.add_image(file_path, authors, tags, characters)
+    return image
 
 
 def add_tags(image_id: int, tags: List[str]):
@@ -60,3 +61,4 @@ def get_all_images():
 def get_all_authors():
     """Получить всех авторов."""
     return crud.get_all_authors()
+

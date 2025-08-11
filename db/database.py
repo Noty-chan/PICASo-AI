@@ -1,7 +1,9 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = 'sqlite:///./photos.db'
+# Путь к БД настраивается через переменную окружения
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./photos.db")
 
 engine = create_engine(DATABASE_URL, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False, future=True)
