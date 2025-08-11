@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Tuple
 
 from taggers import get_tagger, BaseTagger
+import config
 
 try:  # Опциональная зависимость для классификации CLIP
     import open_clip
@@ -65,7 +66,7 @@ def classify_image(path: str) -> str:
 
 def move_to_category(path: str, image_type: str) -> str:
     """Переместить файл в директорию по типу."""
-    mapping = {"anime": "data/anime", "photo": "data/photos", "document": "data/docs"}
+    mapping = config.CATEGORY_DIRS
     target_dir = Path(mapping[image_type])
     target_dir.mkdir(parents=True, exist_ok=True)
     destination = target_dir / Path(path).name
