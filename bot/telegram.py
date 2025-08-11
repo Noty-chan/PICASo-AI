@@ -1,4 +1,5 @@
 import os
+import config
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import (
     Application,
@@ -81,8 +82,8 @@ async def add_photo(update: Update, context: CallbackContext) -> int:
         return ADD_PHOTO
     photo = update.message.photo[-1]  # Берем фото наибольшего размера
     file = await context.bot.get_file(photo.file_id)
-    raw_path = f"photos/{photo.file_unique_id}.jpg"
-    os.makedirs('photos', exist_ok=True)
+    raw_path = os.path.join(config.PHOTOS_DIR, f"{photo.file_unique_id}.jpg")
+    os.makedirs(config.PHOTOS_DIR, exist_ok=True)
     await file.download_to_drive(raw_path)
     new_path, tagger = prepare_image(raw_path)
     suggested_tags = tagger.suggest_tags(new_path)
