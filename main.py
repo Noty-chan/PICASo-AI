@@ -25,7 +25,7 @@ def create_command_menu():
         ["/add➕", "/update⬆️"],
         ["/search_author👤", "/search_tag🔖"],
         ["/search_character👥", "/display📱"],
-        ["/help🆘"]
+        ["/search_author_list📋", "/help🆘"]
     ]
     return ReplyKeyboardMarkup(command_menu, resize_keyboard=True, one_time_keyboard=True)
 
@@ -40,6 +40,15 @@ def create_navigation_buttons(current_index, total):
     return InlineKeyboardMarkup([keyboard] if keyboard else [])
 
 
+def create_author_navigation_buttons(current_index, total):
+    keyboard = []
+    if current_index > 0:
+        keyboard.append(InlineKeyboardButton("⬅️ Предыдущий", callback_data=f"author_prev_{current_index}"))
+    if current_index < total - 1:
+        keyboard.append(InlineKeyboardButton("Следующий ➡️", callback_data=f"author_next_{current_index}"))
+    return InlineKeyboardMarkup([keyboard] if keyboard else [])
+
+
 # Команда /start
 async def start(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(
@@ -50,6 +59,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         "/search_author - Найти по автору\n"
         "/search_tag - Найти по тегу\n"
         "/search_character - Найти по персонажу\n"
+        "/search_author_list - Список всех авторов\n"
         "/display - Показать все записи\n"
         "/help - Показать список команд",
         parse_mode="HTML",
@@ -199,6 +209,22 @@ async def search_author_result(update: Update, context: CallbackContext) -> None
         await update.message.reply_text(f"❌ Записей с автором '{author}' не найдено.")
 
 
+async def search_author_list(update: Update, context: CallbackContext) -> None:
+    authors = handlers.get_all_authors()
+    if not authors:
+        await update.message.reply_text("❌ В базе данных нет авторов.")
+        return
+
+    context.user_data['author_index'] = 0
+    context.user_data['authors'] = authors
+    author = authors[0]
+    await update.message.reply_text(
+        f"<b>Автор:</b> {author.name}",
+        parse_mode="HTML",
+        reply_markup=create_author_navigation_buttons(0, len(authors))
+    )
+
+
 # Команда /search_tag
 async def search_tag(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text("🔍 Введите тег для поиска:")
@@ -325,6 +351,31 @@ async def button_handler(update: Update, context: CallbackContext) -> None:
         await query.message.edit_text(f"❌ Произошла ошибка при обновлении фотографии: {str(e)}")
 
 
+async def author_button_handler(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    authors = context.user_data.get('authors', [])
+    if not authors:
+        await query.message.edit_text("❌ Ошибка: список авторов недоступен.")
+        return
+
+    current_index = context.user_data.get('author_index', 0)
+    data = query.data
+    if data.startswith("author_prev_"):
+        current_index = max(0, current_index - 1)
+    elif data.startswith("author_next_"):
+        current_index = min(len(authors) - 1, current_index + 1)
+
+    context.user_data['author_index'] = current_index
+    author = authors[current_index]
+    await query.message.edit_text(
+        f"<b>Автор:</b> {author.name}",
+        parse_mode="HTML",
+        reply_markup=create_author_navigation_buttons(current_index, len(authors))
+    )
+
+
 # Команда /cancel
 async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text(
@@ -343,6 +394,7 @@ async def help_command(update: Update, context: CallbackContext) -> None:
         "/search_author - Найти по автору\n"
         "/search_tag - Найти по тегу\n"
         "/search_character - Найти по персонажу\n"
+        "/search_author_list - Список всех авторов\n"
         "/display - Показать все записи\n"
         "/help - Показать список команд",
         parse_mode="HTML",
@@ -423,8 +475,12 @@ def main() -> None:
     # Обработчик команды /display
     application.add_handler(CommandHandler("display", display_entries))
 
+    # Обработчик списка авторов
+    application.add_handler(CommandHandler("search_author_list", search_author_list))
+
     # Обработчик кнопок пролистывания
     application.add_handler(CallbackQueryHandler(button_handler, pattern="^(prev|next)_"))
+    application.add_handler(CallbackQueryHandler(author_button_handler, pattern="^(author_prev|author_next)_"))
 
     # Обработчик команды /help
     application.add_handler(CommandHandler("help", help_command))

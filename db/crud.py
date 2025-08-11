@@ -131,3 +131,9 @@ def get_all_images():
             .order_by(models.Image.id)
             .all()
         )
+
+
+def get_all_authors():
+    """Получить список всех авторов."""
+    with get_session() as session:
+        return session.query(models.Author).order_by(models.Author.name).all()
