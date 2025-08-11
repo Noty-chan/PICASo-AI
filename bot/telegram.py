@@ -23,7 +23,8 @@ def create_command_menu():
         ["/add➕", "/update⬆️"],
         ["/search_author👤", "/search_tag🔖"],
         ["/search_character👥", "/display📱"],
-        ["/search_author_list📋", "/help🆘"]
+        ["/tag_add➕", "/tag_remove➖"],
+        ["/search_author_list📋", "/help🆘"],
     ]
     return ReplyKeyboardMarkup(command_menu, resize_keyboard=True, one_time_keyboard=True)
 
@@ -57,6 +58,9 @@ async def start(update: Update, context: CallbackContext) -> None:
         "/search_author - Найти по автору\n"
         "/search_tag - Найти по тегу\n"
         "/search_character - Найти по персонажу\n"
+        "/tag_add - Добавить теги к записи\n"
+        "/tag_remove - Удалить тег из записи\n"
+
         "/search_author_list - Список всех авторов\n"
         "/display - Показать все записи\n"
         "/help - Показать список команд",
@@ -108,10 +112,12 @@ async def add_characters(update: Update, context: CallbackContext) -> int:
     context.user_data['characters'] = [
         character.strip() for character in update.message.text.split(',') if character.strip()
     ]
+    tags = set(context.user_data.get('suggested_tags', []))
+    tags.update(context.user_data.get('tags', []))
     handlers.add_image(
         context.user_data['file_path'],
         context.user_data.get('authors'),
-        context.user_data.get('tags'),
+        list(tags),
         context.user_data['characters'],
     )
     await update.message.reply_text("✅ Фотография добавлена!", parse_mode="HTML")
@@ -283,6 +289,37 @@ async def search_character_result(update: Update, context: CallbackContext) -> N
     else:
         await update.message.reply_text(f"❌ Записей с персонажем '{character}' не найдено.")
 
+async def tag_add_cmd(update: Update, context: CallbackContext) -> None:
+    """Добавить теги к существующей записи."""
+    if len(context.args) < 2:
+        await update.message.reply_text("Использование: /tag_add <id> <tag1,tag2>")
+        return
+    try:
+        image_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("ID должен быть числом.")
+        return
+    tags = [t.strip() for t in ' '.join(context.args[1:]).split(',') if t.strip()]
+    handlers.add_tags(image_id, tags)
+    await update.message.reply_text("✅ Теги добавлены.")
+
+
+async def tag_remove_cmd(update: Update, context: CallbackContext) -> None:
+    """Удалить тег из записи."""
+    if len(context.args) < 2:
+        await update.message.reply_text("Использование: /tag_remove <id> <tag>")
+        return
+    try:
+        image_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("ID должен быть числом.")
+        return
+    tag = ' '.join(context.args[1:]).strip()
+    if not tag:
+        await update.message.reply_text("Укажите тег для удаления.")
+        return
+    handlers.remove_tag(image_id, tag)
+    await update.message.reply_text("✅ Тег удалён.")
 
 # Команда /display
 async def display_entries(update: Update, context: CallbackContext) -> None:
@@ -401,6 +438,8 @@ async def help_command(update: Update, context: CallbackContext) -> None:
         "/search_author - Найти по автору\n"
         "/search_tag - Найти по тегу\n"
         "/search_character - Найти по персонажу\n"
+        "/tag_add - Добавить теги к записи\n"
+        "/tag_remove - Удалить тег из записи\n"
         "/search_author_list - Список всех авторов\n"
         "/display - Показать все записи\n"
         "/help - Показать список команд",
@@ -467,6 +506,8 @@ def register_handlers(application: Application) -> None:
     )
     application.add_handler(search_character_conversation_handler)
 
+    application.add_handler(CommandHandler("tag_add", tag_add_cmd))
+    application.add_handler(CommandHandler("tag_remove", tag_remove_cmd))
     application.add_handler(CommandHandler("display", display_entries))
     application.add_handler(CommandHandler("search_author_list", search_author_list))
     application.add_handler(CallbackQueryHandler(button_handler, pattern="^(prev|next)_"))
