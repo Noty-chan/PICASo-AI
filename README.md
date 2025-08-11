@@ -35,3 +35,7 @@
 git clone https://github.com/ваш-username/image-tagbot.git
 cd image-tagbot
 ```
+2. Установите токен бота в переменную окружения `BOT_TOKEN`:
+```bash
+export BOT_TOKEN="ВАШ_ТОКЕН"
+```

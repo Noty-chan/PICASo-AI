@@ -12,7 +12,9 @@ from telegram.ext import (
 from bot import handlers
 from db.database import init_db
 
-TOKEN = 'YOUR_BOT_ID'
+TOKEN = os.getenv("BOT_TOKEN")
+if TOKEN is None:
+    raise ValueError("Переменная окружения BOT_TOKEN не установлена")
 
 # Определяем состояния для ConversationHandler
 ADD_PHOTO, ADD_AUTHORS, ADD_TAGS, ADD_CHARACTERS = range(4)
