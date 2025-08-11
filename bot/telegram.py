@@ -60,6 +60,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         "/search_character - Найти по персонажу\n"
         "/tag_add - Добавить теги к записи\n"
         "/tag_remove - Удалить тег из записи\n"
+
         "/search_author_list - Список всех авторов\n"
         "/display - Показать все записи\n"
         "/help - Показать список команд",
@@ -288,7 +289,6 @@ async def search_character_result(update: Update, context: CallbackContext) -> N
     else:
         await update.message.reply_text(f"❌ Записей с персонажем '{character}' не найдено.")
 
-
 async def tag_add_cmd(update: Update, context: CallbackContext) -> None:
     """Добавить теги к существующей записи."""
     if len(context.args) < 2:
@@ -320,7 +320,6 @@ async def tag_remove_cmd(update: Update, context: CallbackContext) -> None:
         return
     handlers.remove_tag(image_id, tag)
     await update.message.reply_text("✅ Тег удалён.")
-
 
 # Команда /display
 async def display_entries(update: Update, context: CallbackContext) -> None:
