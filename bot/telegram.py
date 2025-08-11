@@ -10,7 +10,7 @@ from telegram.ext import (
     CallbackContext,
     ConversationHandler,
 )
-from . import handlers
+from . import add_handlers, update_handlers, search_handlers, utils
 from classifier import prepare_image
 
 # Определяем состояния для ConversationHandler
@@ -115,7 +115,7 @@ async def add_characters(update: Update, context: CallbackContext) -> int:
     ]
     tags = set(context.user_data.get('suggested_tags', []))
     tags.update(context.user_data.get('tags', []))
-    handlers.add_image(
+    add_handlers.add_image(
         context.user_data['file_path'],
         context.user_data.get('authors'),
         list(tags),
@@ -134,7 +134,7 @@ async def update_entry(update: Update, context: CallbackContext) -> int:
 async def update_id(update: Update, context: CallbackContext) -> int:
     try:
         entry_id = int(update.message.text)
-        image = handlers.get_image(entry_id)
+        image = utils.get_image(entry_id)
         if not image:
             await update.message.reply_text("❌ Запись с таким ID не найдена. Введите другой ID:")
             return UPDATE_ID
@@ -176,7 +176,7 @@ async def update_tags_skip(update: Update, context: CallbackContext) -> int:
 async def update_characters(update: Update, context: CallbackContext) -> int:
     if update.message.text != "/skip":
         context.user_data['new_characters'] = [character.strip() for character in update.message.text.split(',')]
-    handlers.update_image(
+    update_handlers.update_image(
         context.user_data['id'],
         authors=context.user_data.get('new_authors'),
         tags=context.user_data.get('new_tags'),
@@ -187,7 +187,7 @@ async def update_characters(update: Update, context: CallbackContext) -> int:
 
 
 async def update_characters_skip(update: Update, context: CallbackContext) -> int:
-    handlers.update_image(
+    update_handlers.update_image(
         context.user_data['id'],
         authors=context.user_data.get('new_authors'),
         tags=context.user_data.get('new_tags'),
@@ -205,7 +205,7 @@ async def search_author(update: Update, context: CallbackContext) -> None:
 
 async def search_author_result(update: Update, context: CallbackContext) -> None:
     author = update.message.text
-    results = handlers.search_images_by_author(author)
+    results = search_handlers.search_images_by_author(author)
     if results:
         for image in results:
             caption = (
@@ -224,7 +224,7 @@ async def search_author_result(update: Update, context: CallbackContext) -> None
 
 
 async def search_author_list(update: Update, context: CallbackContext) -> None:
-    authors = handlers.get_all_authors()
+    authors = utils.get_all_authors()
     if not authors:
         await update.message.reply_text("❌ В базе данных нет авторов.")
         return
@@ -247,7 +247,7 @@ async def search_tag(update: Update, context: CallbackContext) -> None:
 
 async def search_tag_result(update: Update, context: CallbackContext) -> None:
     tag = update.message.text
-    results = handlers.search_images_by_tag(tag)
+    results = search_handlers.search_images_by_tag(tag)
     if results:
         for image in results:
             caption = (
@@ -273,7 +273,7 @@ async def search_character(update: Update, context: CallbackContext) -> None:
 
 async def search_character_result(update: Update, context: CallbackContext) -> None:
     character = update.message.text
-    results = handlers.search_images_by_character(character)
+    results = search_handlers.search_images_by_character(character)
     if results:
         for image in results:
             caption = (
@@ -301,7 +301,7 @@ async def tag_add_cmd(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("ID должен быть числом.")
         return
     tags = [t.strip() for t in ' '.join(context.args[1:]).split(',') if t.strip()]
-    handlers.add_tags(image_id, tags)
+    add_handlers.add_tags(image_id, tags)
     await update.message.reply_text("✅ Теги добавлены.")
 
 
@@ -319,12 +319,12 @@ async def tag_remove_cmd(update: Update, context: CallbackContext) -> None:
     if not tag:
         await update.message.reply_text("Укажите тег для удаления.")
         return
-    handlers.remove_tag(image_id, tag)
+    add_handlers.remove_tag(image_id, tag)
     await update.message.reply_text("✅ Тег удалён.")
 
 # Команда /display
 async def display_entries(update: Update, context: CallbackContext) -> None:
-    entries = handlers.get_all_images()
+    entries = utils.get_all_images()
     if not entries:
         await update.message.reply_text("❌ В базе данных нет записей.")
         return
