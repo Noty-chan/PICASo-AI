@@ -60,6 +60,24 @@ def update_image(image_id: int, new_authors=None, new_tags=None, new_characters=
         session.flush()
         return image
 
+
+def add_tags(image_id: int, new_tags=None):
+    """Добавить теги к изображению."""
+    return update_image(image_id, new_tags=new_tags)
+
+
+def remove_tag(image_id: int, tag_name: str):
+    """Удалить тег у изображения."""
+    with get_session() as session:
+        image = session.get(models.Image, image_id)
+        if not image:
+            return None
+        tag = session.query(models.Tag).filter_by(name=tag_name).first()
+        if tag and tag in image.tags:
+            image.tags.remove(tag)
+        session.flush()
+        return image
+
 def search_by_author(author_name: str):
     with get_session() as session:
         return (
