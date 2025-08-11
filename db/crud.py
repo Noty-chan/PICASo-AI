@@ -101,3 +101,33 @@ def search_by_character(character_name: str):
             .filter(models.Character.name.ilike(f"%{character_name}%"))
             .all()
         )
+
+
+def get_image(image_id: int):
+    """Получить изображение по ID вместе с его связями."""
+    with get_session() as session:
+        return (
+            session.query(models.Image)
+            .options(
+                selectinload(models.Image.authors),
+                selectinload(models.Image.tags),
+                selectinload(models.Image.characters),
+            )
+            .filter(models.Image.id == image_id)
+            .first()
+        )
+
+
+def get_all_images():
+    """Получить все изображения с отсортированными связями."""
+    with get_session() as session:
+        return (
+            session.query(models.Image)
+            .options(
+                selectinload(models.Image.authors),
+                selectinload(models.Image.tags),
+                selectinload(models.Image.characters),
+            )
+            .order_by(models.Image.id)
+            .all()
+        )

@@ -26,3 +26,13 @@ def search_images_by_tag(name: str):
 def search_images_by_character(name: str):
     """Найти изображения по персонажу."""
     return crud.search_by_character(name)
+
+
+def get_image(image_id: int):
+    """Получить изображение по ID."""
+    return crud.get_image(image_id)
+
+
+def get_all_images():
+    """Получить все изображения."""
+    return crud.get_all_images()

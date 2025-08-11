@@ -1,4 +1,3 @@
-import json
 import os
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import (
@@ -10,89 +9,10 @@ from telegram.ext import (
     CallbackContext,
     ConversationHandler,
 )
+from bot import handlers
+from db.database import init_db
 
 TOKEN = 'YOUR_BOT_ID'
-
-
-# Класс для базы данных фотографий
-class PhotoDatabase:
-    def __init__(self, filename='photos.json'):
-        self.filename = filename
-        self.data = []
-        self.load_data()
-
-    def load_data(self):
-        if os.path.exists(self.filename):
-            with open(self.filename, 'r') as f:
-                self.data = json.load(f)
-
-    def save_data(self):
-        with open(self.filename, 'w') as f:
-            json.dump(self.data, f, indent=4)
-
-    def add_entry(self, file_path, authors, tags, characters):
-        # Сортируем списки по алфавиту
-        sorted_authors = sorted([author.strip() for author in authors], key=lambda x: x.lower())
-        sorted_tags = sorted([tag.strip() for tag in tags], key=lambda x: x.lower())
-        sorted_characters = sorted([character.strip() for character in characters], key=lambda x: x.lower())
-
-        # Добавляем запись
-        entry = {
-            'id': len(self.data) + 1,  # Уникальный ID
-            'file_path': file_path,
-            'authors': sorted_authors,
-            'tags': sorted_tags,
-            'characters': sorted_characters
-        }
-        self.data.append(entry)
-        self.data.sort(key=lambda x: x['id'])  # Сортировка по ID
-        self.save_data()
-
-    def update_entry(self, entry_id, new_authors=None, new_tags=None, new_characters=None):
-        for entry in self.data:
-            if entry['id'] == int(entry_id):
-                # Обновляем авторов, если переданы
-                if new_authors:
-                    new_authors = [author.strip() for author in new_authors if author.strip()]
-                    entry['authors'] = sorted(list(set(entry['authors'] + new_authors)), key=lambda x: x.lower())
-
-                # Обновляем теги
-                if new_tags:
-                    new_tags = [tag.strip() for tag in new_tags if tag.strip()]
-                    entry['tags'] = sorted(list(set(entry['tags'] + new_tags)), key=lambda x: x.lower())
-
-                # Обновляем персонажей
-                if new_characters:
-                    new_characters = [character.strip() for character in new_characters if character.strip()]
-                    entry['characters'] = sorted(list(set(entry['characters'] + new_characters)),
-                                                 key=lambda x: x.lower())
-
-                break
-        self.data.sort(key=lambda x: x['id'])
-        self.save_data()
-
-    def search_by_author(self, author):
-        return [entry for entry in self.data if any(author.lower() in a.lower() for a in entry['authors'])]
-
-    def search_by_tag(self, tag):
-        return [entry for entry in self.data if any(tag.lower() in t.lower() for t in entry['tags'])]
-
-    def search_by_character(self, character):
-        return [entry for entry in self.data if any(character.lower() in c.lower() for c in entry['characters'])]
-
-    def get_entries(self):
-        return sorted(self.data, key=lambda x: x['id'])
-
-    def get_all_authors():
-        authors = set()
-        for entry in db.data:
-            for author in entry['authors']:
-                authors.add(author)
-        return sorted(list(authors), key=lambda x: x.lower())
-
-
-# Создаем экземпляр базы данных
-db = PhotoDatabase()
 
 # Определяем состояния для ConversationHandler
 ADD_PHOTO, ADD_AUTHORS, ADD_TAGS, ADD_CHARACTERS = range(4)
@@ -171,7 +91,7 @@ async def add_tags(update: Update, context: CallbackContext) -> int:
 
 async def add_characters(update: Update, context: CallbackContext) -> int:
     context.user_data['characters'] = [character.strip() for character in update.message.text.split(',')]
-    db.add_entry(
+    handlers.add_image(
         context.user_data['file_path'],
         context.user_data['authors'],
         context.user_data['tags'],
@@ -190,7 +110,8 @@ async def update_entry(update: Update, context: CallbackContext) -> int:
 async def update_id(update: Update, context: CallbackContext) -> int:
     try:
         entry_id = int(update.message.text)
-        if not any(entry['id'] == entry_id for entry in db.data):
+        image = handlers.get_image(entry_id)
+        if not image:
             await update.message.reply_text("❌ Запись с таким ID не найдена. Введите другой ID:")
             return UPDATE_ID
         context.user_data['id'] = entry_id
@@ -231,22 +152,22 @@ async def update_tags_skip(update: Update, context: CallbackContext) -> int:
 async def update_characters(update: Update, context: CallbackContext) -> int:
     if update.message.text != "/skip":
         context.user_data['new_characters'] = [character.strip() for character in update.message.text.split(',')]
-    db.update_entry(
+    handlers.update_image(
         context.user_data['id'],
-        new_authors=context.user_data.get('new_authors'),
-        new_tags=context.user_data.get('new_tags'),
-        new_characters=context.user_data.get('new_characters')
+        authors=context.user_data.get('new_authors'),
+        tags=context.user_data.get('new_tags'),
+        characters=context.user_data.get('new_characters')
     )
     await update.message.reply_text("✅ Запись обновлена!", parse_mode="HTML")
     return ConversationHandler.END
 
 
 async def update_characters_skip(update: Update, context: CallbackContext) -> int:
-    db.update_entry(
+    handlers.update_image(
         context.user_data['id'],
-        new_authors=context.user_data.get('new_authors'),
-        new_tags=context.user_data.get('new_tags'),
-        new_characters=context.user_data.get('new_characters')
+        authors=context.user_data.get('new_authors'),
+        tags=context.user_data.get('new_tags'),
+        characters=context.user_data.get('new_characters')
     )
     await update.message.reply_text("✅ Запись обновлена!", parse_mode="HTML")
     return ConversationHandler.END
@@ -260,38 +181,22 @@ async def search_author(update: Update, context: CallbackContext) -> None:
 
 async def search_author_result(update: Update, context: CallbackContext) -> None:
     author = update.message.text
-    results = db.search_by_author(author)
+    results = handlers.search_images_by_author(author)
     if results:
-        for entry in results:
+        for image in results:
             caption = (
-                f"<b>ID:</b> {entry['id']}\n"
-                f"<b>👤 Авторы:</b> {', '.join(entry['authors'])}\n"
-                f"<b>🏷️ Теги:</b> {', '.join(entry['tags'])}\n"
-                f"<b>👥 Персонажи:</b> {', '.join(entry['characters'])}"
+                f"<b>ID:</b> {image.id}\n"
+                f"<b>👤 Авторы:</b> {', '.join(a.name for a in image.authors)}\n"
+                f"<b>🏷️ Теги:</b> {', '.join(t.name for t in image.tags)}\n"
+                f"<b>👥 Персонажи:</b> {', '.join(c.name for c in image.characters)}"
             )
             try:
-                await update.message.reply_photo(photo=open(entry['file_path'], 'rb'), caption=caption,
+                await update.message.reply_photo(photo=open(image.file_path, 'rb'), caption=caption,
                                                  parse_mode="HTML")
             except FileNotFoundError:
-                await update.message.reply_text(f"❌ Фотография с ID {entry['id']} не найдена на сервере.")
+                await update.message.reply_text(f"❌ Фотография с ID {image.id} не найдена на сервере.")
     else:
         await update.message.reply_text(f"❌ Записей с автором '{author}' не найдено.")
-
-
-async def search_author_list(update: Update, context: CallbackContext) -> None:
-    authors = get_all_authors()
-    if not authors:
-        await update.message.reply_text("❌ В базе данных нет авторов.")
-        return
-    context.user_data['authors_list'] = authors
-    context.user_data['current_author_index'] = 0
-
-    current_author = authors[0]
-    await update.message.reply_text(
-        f"👤 Автор: <b>{current_author}</b>",
-        parse_mode="HTML",
-        reply_markup=create_author_navigation_buttons(0, len(authors))
-    )
 
 
 # Команда /search_tag
@@ -302,20 +207,20 @@ async def search_tag(update: Update, context: CallbackContext) -> None:
 
 async def search_tag_result(update: Update, context: CallbackContext) -> None:
     tag = update.message.text
-    results = db.search_by_tag(tag)
+    results = handlers.search_images_by_tag(tag)
     if results:
-        for entry in results:
+        for image in results:
             caption = (
-                f"<b>ID:</b> {entry['id']}\n"
-                f"<b>👤 Авторы:</b> {', '.join(entry['authors'])}\n"
-                f"<b>🏷️ Теги:</b> {', '.join(entry['tags'])}\n"
-                f"<b>👥 Персонажи:</b> {', '.join(entry['characters'])}"
+                f"<b>ID:</b> {image.id}\n"
+                f"<b>👤 Авторы:</b> {', '.join(a.name for a in image.authors)}\n"
+                f"<b>🏷️ Теги:</b> {', '.join(t.name for t in image.tags)}\n"
+                f"<b>👥 Персонажи:</b> {', '.join(c.name for c in image.characters)}"
             )
             try:
-                await update.message.reply_photo(photo=open(entry['file_path'], 'rb'), caption=caption,
+                await update.message.reply_photo(photo=open(image.file_path, 'rb'), caption=caption,
                                                  parse_mode="HTML")
             except FileNotFoundError:
-                await update.message.reply_text(f"❌ Фотография с ID {entry['id']} не найдена на сервере.")
+                await update.message.reply_text(f"❌ Фотография с ID {image.id} не найдена на сервере.")
     else:
         await update.message.reply_text(f"❌ Записей с тегом '{tag}' не найдено.")
 
@@ -328,50 +233,49 @@ async def search_character(update: Update, context: CallbackContext) -> None:
 
 async def search_character_result(update: Update, context: CallbackContext) -> None:
     character = update.message.text
-    results = db.search_by_character(character)
+    results = handlers.search_images_by_character(character)
     if results:
-        for entry in results:
+        for image in results:
             caption = (
-                f"<b>ID:</b> {entry['id']}\n"
-                f"<b>👤 Авторы:</b> {', '.join(entry['authors'])}\n"
-                f"<b>🏷️ Теги:</b> {', '.join(entry['tags'])}\n"
-                f"<b>👥 Персонажи:</b> {', '.join(entry['characters'])}"
+                f"<b>ID:</b> {image.id}\n"
+                f"<b>👤 Авторы:</b> {', '.join(a.name for a in image.authors)}\n"
+                f"<b>🏷️ Теги:</b> {', '.join(t.name for t in image.tags)}\n"
+                f"<b>👥 Персонажи:</b> {', '.join(c.name for c in image.characters)}"
             )
             try:
-                await update.message.reply_photo(photo=open(entry['file_path'], 'rb'), caption=caption,
+                await update.message.reply_photo(photo=open(image.file_path, 'rb'), caption=caption,
                                                  parse_mode="HTML")
             except FileNotFoundError:
-                await update.message.reply_text(f"❌ Фотография с ID {entry['id']} не найдена на сервере.")
+                await update.message.reply_text(f"❌ Фотография с ID {image.id} не найдена на сервере.")
     else:
         await update.message.reply_text(f"❌ Записей с персонажем '{character}' не найдено.")
 
 
 # Команда /display
 async def display_entries(update: Update, context: CallbackContext) -> None:
-    entries = db.get_entries()
+    entries = handlers.get_all_images()
     if not entries:
         await update.message.reply_text("❌ В базе данных нет записей.")
         return
 
-    # Отправляем первое фото с кнопками
-    entry = entries[0]
+    image = entries[0]
     caption = (
-        f"<b>ID:</b> {entry['id']}\n"
-        f"<b>👤 Авторы:</b> {', '.join(entry['authors'])}\n"
-        f"<b>🏷️ Теги:</b> {', '.join(entry['tags'])}\n"
-        f"<b>👥 Персонажи:</b> {', '.join(entry['characters'])}"
+        f"<b>ID:</b> {image.id}\n"
+        f"<b>👤 Авторы:</b> {', '.join(a.name for a in image.authors)}\n"
+        f"<b>🏷️ Теги:</b> {', '.join(t.name for t in image.tags)}\n"
+        f"<b>👥 Персонажи:</b> {', '.join(c.name for c in image.characters)}"
     )
     try:
-        context.user_data['current_index'] = 0  # Сохраняем текущий индекс
-        context.user_data['display_entries'] = entries  # Сохраняем список записей
+        context.user_data['current_index'] = 0
+        context.user_data['display_entries'] = entries
         await update.message.reply_photo(
-            photo=open(entry['file_path'], 'rb'),
+            photo=open(image.file_path, 'rb'),
             caption=caption,
             parse_mode="HTML",
             reply_markup=create_navigation_buttons(0, len(entries))
         )
     except FileNotFoundError:
-        await update.message.reply_text(f"❌ Фотография с ID {entry['id']} не найдена на сервере.")
+        await update.message.reply_text(f"❌ Фотография с ID {image.id} не найдена на сервере.")
     except Exception as e:
         await update.message.reply_text(f"❌ Произошла ошибка при отображении фотографии: {str(e)}")
 
@@ -400,23 +304,23 @@ async def button_handler(update: Update, context: CallbackContext) -> None:
         return
 
     context.user_data['current_index'] = current_index
-    entry = entries[current_index]
+    image = entries[current_index]
 
     caption = (
-        f"<b>ID:</b> {entry['id']}\n"
-        f"<b>👤 Авторы:</b> {', '.join(entry['authors'])}\n"
-        f"<b>🏷️ Теги:</b> {', '.join(entry['tags'])}\n"
-        f"<b>👥 Персонажи:</b> {', '.join(entry['characters'])}"
+        f"<b>ID:</b> {image.id}\n"
+        f"<b>👤 Авторы:</b> {', '.join(a.name for a in image.authors)}\n"
+        f"<b>🏷️ Теги:</b> {', '.join(t.name for t in image.tags)}\n"
+        f"<b>👥 Персонажи:</b> {', '.join(c.name for c in image.characters)}"
     )
 
     try:
         # Обновляем сообщение с новым фото и кнопками
         await query.message.edit_media(
-            media=InputMediaPhoto(open(entry['file_path'], 'rb'), caption=caption, parse_mode="HTML"),
+            media=InputMediaPhoto(open(image.file_path, 'rb'), caption=caption, parse_mode="HTML"),
             reply_markup=create_navigation_buttons(current_index, len(entries))
         )
     except FileNotFoundError:
-        await query.message.edit_text(f"❌ Фотография с ID {entry['id']} не найдена на сервере.")
+        await query.message.edit_text(f"❌ Фотография с ID {image.id} не найдена на сервере.")
     except Exception as e:
         await query.message.edit_text(f"❌ Произошла ошибка при обновлении фотографии: {str(e)}")
 
@@ -447,7 +351,8 @@ async def help_command(update: Update, context: CallbackContext) -> None:
 
 
 def main() -> None:
-    # Создаем директорию для фото
+    # Инициализируем базу данных и создаем директорию для фото
+    init_db()
     os.makedirs('photos', exist_ok=True)
 
     # Создаем приложение с токеном
