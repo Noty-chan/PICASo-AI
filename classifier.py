@@ -38,9 +38,15 @@ def _load_classifier():
     if open_clip is None or torch is None or Image is None:
         return None, None, None
     if _model is None:
-        _model, _preprocess = open_clip.create_model_and_transforms(
+        result = open_clip.create_model_and_transforms(
             MODEL_NAME, pretrained=MODEL_WEIGHTS
         )
+        # open_clip может возвращать либо пару (model, preprocess),
+        # либо тройку (model, preprocess_train, preprocess_val)
+        if isinstance(result, tuple) and len(result) == 3:
+            _model, _, _preprocess = result
+        else:
+            _model, _preprocess = result
         _tokenizer = open_clip.get_tokenizer(MODEL_NAME)
     return _model, _preprocess, _tokenizer
 

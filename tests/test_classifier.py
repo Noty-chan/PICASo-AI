@@ -1,4 +1,5 @@
 import shutil
+import types
 from pathlib import Path
 
 import classifier
@@ -62,3 +63,32 @@ def test_prepare_image_calls_classify_and_move(monkeypatch):
     assert calls["classify"] == "old/file.png"
     assert calls["move"] == ("old/file.png", "anime")
     assert calls["tagger"] == "anime"
+
+
+def test_load_classifier_handles_three_outputs(monkeypatch):
+    dummy_model = object()
+    dummy_preprocess_val = object()
+
+    def fake_create_model_and_transforms(name, pretrained=None):
+        return dummy_model, object(), dummy_preprocess_val
+
+    def fake_get_tokenizer(name):
+        return "tok"
+
+    dummy_module = types.SimpleNamespace(
+        create_model_and_transforms=fake_create_model_and_transforms,
+        get_tokenizer=fake_get_tokenizer,
+    )
+    monkeypatch.setattr(classifier, "open_clip", dummy_module)
+    monkeypatch.setattr(classifier, "torch", object())
+    monkeypatch.setattr(classifier, "Image", object())
+    monkeypatch.setattr(classifier, "_model", None)
+    monkeypatch.setattr(classifier, "_preprocess", None)
+    monkeypatch.setattr(classifier, "_tokenizer", None)
+
+    model, preprocess, tokenizer = classifier._load_classifier()
+
+    assert model is dummy_model
+    assert preprocess is dummy_preprocess_val
+    assert tokenizer == "tok"
+
