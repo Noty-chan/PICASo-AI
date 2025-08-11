@@ -36,12 +36,16 @@
 git clone https://github.com/ваш-username/image-tagbot.git
 cd image-tagbot
 ```
-2. Установите токен бота в переменную окружения `BOT_TOKEN`:
+2. Установите зависимости проекта:
+```bash
+pip install -r requirements.txt
+```
+3. Установите токен бота в переменную окружения `BOT_TOKEN`:
 ```bash
  export BOT_TOKEN="ВАШ_ТОКЕН"
  ```
 
-3. (Опционально) укажите путь к базе данных:
+4. (Опционально) укажите путь к базе данных:
    ```bash
    export DATABASE_URL="sqlite:///./photos.db"
    ```

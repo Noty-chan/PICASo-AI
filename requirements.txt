@@ -1,0 +1,9 @@
+python-telegram-bot
+sqlalchemy
+alembic
+open-clip-torch
+torch
+Pillow
+deepdanbooru
+transformers
+pytesseract
