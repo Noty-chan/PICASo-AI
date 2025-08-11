@@ -36,3 +36,8 @@ def get_image(image_id: int):
 def get_all_images():
     """Получить все изображения."""
     return crud.get_all_images()
+
+
+def get_all_authors():
+    """Получить всех авторов."""
+    return crud.get_all_authors()
