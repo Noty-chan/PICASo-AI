@@ -28,6 +28,13 @@ class AnimeTagger(BaseTagger):
         if self.model and dd:
             image = dd.image.load_image_for_evaluate(path)
             result = dd.project.evaluate_image(self.model, self.tags, image)
-            return [tag for tag, score in result.items() if score >= self.threshold]
+            # Сортируем теги по убыванию вероятности
+            tags_scores = sorted(result.items(), key=lambda x: x[1], reverse=True)
+            top = tags_scores[:10]
+            # Фильтруем теги по порогу, но гарантируем минимум 5 тегов
+            filtered = [tag for tag, score in top if score >= self.threshold]
+            if len(filtered) < 5:
+                filtered = [tag for tag, _ in top][:5]
+            return filtered
         # Fallback-результат
         return ["anime", "sample"]
